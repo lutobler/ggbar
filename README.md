@@ -11,7 +11,7 @@ E.g. `ggbar 0 0 1920 20 0`
 
 - Why? Polybar doesn't really support HerbstluftWM. Also making this
 was easier than figuring out how to configure Polybar.
-- Why Rust? Good question! As it turns out, its a bit pointless if you just
+- Why Rust? Good question! As it turns out, it's a bit pointless if you just
 use bindings for XCB and Cairo.
 - How to configure? Edit the source code.
 
