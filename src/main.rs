@@ -1,11 +1,3 @@
-extern crate xcb;
-extern crate cairo_sys;
-extern crate cairo;
-extern crate pango;
-extern crate pangocairo;
-extern crate chrono;
-
-use chrono::Local;
 use std::thread;
 use std::time::Duration;
 use std::process::{Command, Stdio};
@@ -15,183 +7,15 @@ use std::io::{BufRead, BufReader};
 mod config;
 use config::*;
 
-trait Renderable {
-    fn render(&self, cairo: &cairo::Context);
-}
+mod modules;
+use modules::BarModule;
+use modules::basebar;
+use modules::herbstluftwm;
+use modules::clock;
+use modules::battery;
 
-/*
- * Bar modules
- */
-struct BaseBar {}                       // bar background
-struct HerbstluftWM { config: Config }  // hlwm tag indicator
-struct Clock { config: Config }         // clock
-
-impl Renderable for BaseBar {
-    fn render(&self, cairo: &cairo::Context) {
-        cairo_source_rgb_hex(cairo, COLOR_BG);
-        cairo.paint();
-    }
-}
-
-impl Renderable for HerbstluftWM {
-    fn render(&self, cairo: &cairo::Context) {
-        let tags = Tag::read_hlwm_tags(self.config.monitor);
-
-        // monitor focus status square
-        let mut focus_color = COLOR_MONITOR_UNFOCUSED;
-        for t in tags.iter() {
-            if t.state == TagState::ThisMonitorFocused {
-                focus_color = COLOR_MONITOR_FOCUSED;
-            }
-        }
-        cairo_source_rgb_hex(cairo, focus_color);
-        let focus_state_w = self.config.height;
-        let h = self.config.height;
-        let focus_margin = 0.5 * (h - (h * MONITOR_FOCUS_SIZE));
-        cairo.rectangle(focus_margin,
-                        focus_margin,
-                        focus_state_w - 2.0*focus_margin,
-                        focus_state_w - 2.0*focus_margin);
-        cairo.fill();
-
-        // herstluftwm tags
-        let mut left_border: f64 = focus_state_w;
-        for t in tags {
-            let text = format!("{}", t.name);
-            let b = CairoTextBox {
-                text: text,
-                height: self.config.height,
-                color_text: COLOR_TEXT,
-                color_box: t.state.color(),
-                alignment: Alignment::Left,
-                align: left_border,
-                margin: TAG_MARGIN,
-            };
-            let new_left = b.draw(cairo);
-            left_border = new_left + TAG_SPACE;
-        }
-    }
-}
-
-impl Renderable for Clock {
-    fn render(&self, cairo: &cairo::Context) {
-        let date = Local::now();
-        let time_str = format!("{}", date.format(DATE_FORMAT));
-        let b = CairoTextBox {
-            text: time_str,
-            height: self.config.height,
-            color_text: COLOR_TEXT,
-            color_box: COLOR_BG_CLOCK,
-            alignment: Alignment::Right,
-            align: self.config.width,
-            margin: BLOCK_MARGIN,
-        };
-        b.draw(cairo);
-    }
-}
-
-/*
- * HLWM tag parsing
- */
-
-#[derive(PartialEq)]
-enum TagState {
-    Empty,
-    NonEmpty,
-    ThisMonitorUnfocused,
-    ThisMonitorFocused,
-    DifferentMonitorUnfocused,
-    DifferentMonitorFocused,
-    UrgentWindow,
-}
-
-struct Tag {
-    state: TagState,
-    name: String,
-}
-
-impl TagState {
-    fn from_symbol(sym: char) -> Option<TagState> {
-        match sym {
-            '.' => Some(TagState::Empty),
-            ':' => Some(TagState::NonEmpty),
-            '+' => Some(TagState::ThisMonitorUnfocused),
-            '#' => Some(TagState::ThisMonitorFocused),
-            '-' => Some(TagState::DifferentMonitorUnfocused),
-            '%' => Some(TagState::DifferentMonitorFocused),
-            '!' => Some(TagState::UrgentWindow),
-            _ => None
-        }
-    }
-
-    fn color(&self) -> u32 {
-        match self {
-            TagState::Empty => COLOR_EMPTY,
-            TagState::NonEmpty => COLOR_NON_EMPTY,
-            TagState::ThisMonitorUnfocused => COLOR_THIS_MONITOR_UNFOCUSED,
-            TagState::ThisMonitorFocused => COLOR_THIS_MONITOR_FOCUSED,
-            TagState::DifferentMonitorUnfocused => COLOR_DIFFERENT_MONITOR_UNFOCUSED,
-            TagState::DifferentMonitorFocused => COLOR_DIFFERENT_MONITOR_FOCUSED,
-            TagState::UrgentWindow => COLOR_URGENT_WINDOW,
-        }
-    }
-}
-
-impl Tag {
-    fn from_str(s: &str) -> Option<Tag> {
-        if s.len() == 0 {
-            return None;
-        }
-        let tag_state: TagState;
-        let tag_state_opt = TagState::from_symbol(s[0..].chars().next().unwrap());
-        match tag_state_opt {
-            Some(ts) => tag_state = ts,
-            None => return None
-        }
-
-        Some(Tag {
-            state: tag_state,
-            name: String::from(&s[1..]),
-        })
-    }
-
-    fn read_hlwm_tags(monitor: i32) -> Vec<Tag> {
-        let hc_output = Command::new("/usr/bin/herbstclient")
-            .arg("tag_status")
-            .arg(monitor.to_string())
-            .output()
-            .expect("failed to execute command");
-        let tags_hc_out = String::from_utf8_lossy(&hc_output.stdout);
-        let tags_str: Vec<&str> = tags_hc_out.split('\t').collect();
-        let mut tags: Vec<Tag> = Vec::new();
-        for t in tags_str {
-            let t_opt = Tag::from_str(t);
-            match t_opt {
-                Some(tt) => tags.push(tt),
-                None => continue,
-            }
-        }
-        return tags
-    }
-}
-
-/*
- * Cairo drawing functions
- */
-fn cairo_source_rgb_hex(cairo: &cairo::Context, color: u32) {
-    cairo.set_source_rgb(
-        ((color >> 16) & 0xff) as f64 / 255.0,
-        ((color >> 8) & 0xff) as f64 / 255.0,
-        ((color >> 0) & 0xff) as f64 / 255.0);
-}
-
-fn setup_pango_layout(cairo: &cairo::Context) -> pango::Layout {
-    let pango_layout = pangocairo::create_layout(&cairo)
-        .expect("failed create pango layout");
-    let font_description = pango::FontDescription::from_string(FONT);
-    pango_layout.set_font_description(Some(&font_description));
-    return pango_layout
-}
+mod utils;
+use utils::*;
 
 enum Alignment {
     Left,
@@ -247,12 +71,19 @@ fn draw_thread(bar_state: &BarState, lock: &Mutex<bool>, cvar: &Condvar) {
             signaled = cvar.wait(signaled).unwrap();
         }
 
-        // render all modules
-        let modules = bar_state.modules_global.iter()
-            .chain(bar_state.modules_left.iter())
-            .chain(bar_state.modules_right.iter());
-        for m in modules {
-            m.render(&bar_state.cairo);
+        // render modules
+        for m in bar_state.modules_global.iter() {
+            m.render(&bar_state.cairo, 0.0);
+        }
+
+        let mut l = 0.0;
+        for m in bar_state.modules_left.iter() {
+            l = m.render(&bar_state.cairo, l) + BLOCK_SPACE;
+        }
+        
+        let mut r = bar_state.config.width;
+        for m in bar_state.modules_right.iter() {
+            r = m.render(&bar_state.cairo, r) - BLOCK_SPACE;
         }
 
         xcb::xproto::copy_area(&bar_state.connection,
@@ -304,7 +135,7 @@ fn herbstluftwm_event_generator(lock: &Mutex<bool>, cvar: &Condvar) {
 
 // non-static configuration (given as arg)
 #[derive(Copy, Clone, Default)]
-struct Config {
+pub struct Config {
     x_offset: f64,
     y_offset: f64,
     width: f64,
@@ -319,9 +150,9 @@ struct BarState {
     pixmap: xcb::xproto::Pixmap,
     gcontext: xcb::xproto::Gcontext,
     config: Config,
-    modules_left: Vec<Box<dyn Renderable>>,
-    modules_right: Vec<Box<dyn Renderable>>,
-    modules_global: Vec<Box<dyn Renderable>>,
+    modules_left: Vec<Box<dyn BarModule>>,
+    modules_right: Vec<Box<dyn BarModule>>,
+    modules_global: Vec<Box<dyn BarModule>>,
 }
 unsafe impl Send for BarState {}
 
@@ -378,6 +209,8 @@ fn main() {
     conn.flush();
 
     // set up pixmap
+    // we can't draw on the window directly, we need the double buffering
+    // from xcb_copy
     let pixmap: xcb::xproto::Pixmap = conn.generate_id();
     xcb::xproto::create_pixmap(&conn,
                                screen.root_depth(),
@@ -422,9 +255,20 @@ fn main() {
         pixmap:         pixmap,
         gcontext:       gcontext,
         config:         config,
-        modules_left:   vec![ Box::new(HerbstluftWM { config }), ],
-        modules_right:  vec![ Box::new(Clock { config }), ],
-        modules_global: vec![ Box::new(BaseBar {}), ],
+        modules_left:   vec![
+            Box::new(herbstluftwm::HerbstluftWM { config }),
+        ],
+        modules_right:  vec![
+            Box::new(clock::Clock { config: config }),
+            Box::new(battery::Battery {
+                config: config,
+                dirs: vec![
+                    String::from("/sys/class/power_supply/BAT0/"),
+                    String::from("/sys/class/power_supply/BAT1/"),
+                ],
+            }),
+        ],
+        modules_global: vec![ Box::new(basebar::BaseBar {}), ],
     };
 
     // event generators
@@ -447,5 +291,6 @@ fn main() {
     let draw_thread_handler = thread::spawn(move || {
         draw_thread(&bar_state, &p0.0, &p0.1);
     });
+
     draw_thread_handler.join().unwrap();
 }

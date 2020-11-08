@@ -11,4 +11,4 @@ pango = "0.8.0"
 pangocairo = "0.9.0"
 xcb = { version = "0.9", features = ["shm"] }
 chrono = "0.4.11"
-libc = "0.2.71"
+libpulse-binding = "2.16.0"

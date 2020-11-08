@@ -124,7 +124,7 @@ dependencies = [
  "cairo-rs",
  "cairo-sys-rs",
  "chrono",
- "libc",
+ "libpulse-binding",
  "pango",
  "pangocairo",
  "xcb",
@@ -180,6 +180,28 @@ name = "libc"
 version = "0.2.71"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9457b06509d27052635f90d6466700c65095fdf75409b3fbdd903e988b886f49"
+
+[[package]]
+name = "libpulse-binding"
+version = "2.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "35b35c3c377b537d044107ff0830b4e5ae32a5c106289977a04b3387a143e994"
+dependencies = [
+ "libc",
+ "libpulse-sys",
+ "winapi",
+]
+
+[[package]]
+name = "libpulse-sys"
+version = "1.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa9559e91871e5f820c3b4e181b8c8f3ebd0b7839c92943802caf0f1477fdc27"
+dependencies = [
+ "libc",
+ "pkg-config",
+ "winapi",
+]
 
 [[package]]
 name = "log"
