@@ -32,9 +32,10 @@ impl BarModule for Battery {
 
             // battery symbol
             let bat_sym_h = 0.6 * self.config.height;
-            let bat_sym_w = 25.0;
+            let bat_sym_w = 1.25 * self.config.height;
             let bat_sym_margin = 3.0;
             let bat_sym_left = align - (bat_sym_w + 2.0*bat_sym_margin) - margin;
+            let bat_fill_margin = 0.15 * self.config.height;
 
             // background
             utils::cairo_source_rgb_hex(cairo, COLOR_BG_BATTERY);
@@ -58,10 +59,10 @@ impl BarModule for Battery {
             cairo.fill();
             // faded inner color
             utils::cairo_source_rgb_rgfade(cairo, p);
-            cairo.rectangle(align - (bat_sym_w + bat_sym_margin) + 3.0 - margin,
-                            0.5 * (self.config.height - bat_sym_h) + 3.0,
-                            (bat_sym_w - 6.0) * p,
-                            bat_sym_h - 6.0);
+            cairo.rectangle(align - (bat_sym_w + bat_sym_margin) + bat_fill_margin - margin,
+                            0.5 * (self.config.height - bat_sym_h) + bat_fill_margin,
+                            (bat_sym_w - 2.0 * bat_fill_margin) * p,
+                            bat_sym_h - 2.0 * bat_fill_margin);
             cairo.fill();
 
             let b = CairoTextBox {
