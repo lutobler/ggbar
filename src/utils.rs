@@ -1,3 +1,4 @@
+use std::sync::{Mutex, Condvar};
 use crate::config::*;
 
 pub fn cairo_source_rgb_hex(cairo: &cairo::Context, color: u32) {
@@ -23,4 +24,11 @@ pub fn setup_pango_layout(cairo: &cairo::Context) -> pango::Layout {
     let font_description = pango::FontDescription::from_string(FONT);
     pango_layout.set_font_description(Some(&font_description));
     return pango_layout
+}
+
+pub fn signal_mutex(lock: &Mutex<bool>, cvar: &Condvar) {
+    let mut signaled = lock.lock().unwrap();
+    *signaled = true;
+    cvar.notify_one();
+    drop(signaled);
 }

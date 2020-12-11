@@ -1,18 +1,11 @@
 use std::thread;
-use std::time::Duration;
-use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex, Condvar};
-use std::io::{BufRead, BufReader};
 
 mod config;
 use config::*;
 
 mod modules;
 use modules::BarModule;
-use modules::basebar;
-use modules::herbstluftwm;
-use modules::clock;
-use modules::battery;
 
 mod utils;
 use utils::*;
@@ -80,7 +73,7 @@ fn draw_thread(bar_state: &BarState, lock: &Mutex<bool>, cvar: &Condvar) {
         for m in bar_state.modules_left.iter() {
             l = m.render(&bar_state.cairo, l) + BLOCK_SPACE;
         }
-        
+
         let mut r = bar_state.config.width;
         for m in bar_state.modules_right.iter() {
             r = m.render(&bar_state.cairo, r) - BLOCK_SPACE;
@@ -100,42 +93,9 @@ fn draw_thread(bar_state: &BarState, lock: &Mutex<bool>, cvar: &Condvar) {
     }
 }
 
-fn signal_mutex(lock: &Mutex<bool>, cvar: &Condvar) {
-    let mut signaled = lock.lock().unwrap();
-    *signaled = true;
-    cvar.notify_one();
-    drop(signaled);
-}
-
-fn periodic_event_generator(lock: &Mutex<bool>, cvar: &Condvar) {
-    loop {
-        signal_mutex(lock, cvar);
-        thread::sleep(Duration::from_millis(INTERVAL));
-    }
-}
-
-fn herbstluftwm_event_generator(lock: &Mutex<bool>, cvar: &Condvar) {
-    loop {
-        let hc_output = Command::new("/usr/bin/herbstclient")
-            .arg("-i")
-            .arg("tag_changed|tag_renamed")
-            .stdout(Stdio::piped())
-            .spawn()
-            .expect("failed to execute command")
-            .stdout
-            .expect("failed to execute command");
-        let reader = BufReader::new(hc_output);
-        reader.lines()
-            .filter_map(|line| line.ok())
-            .for_each(|_| {
-                signal_mutex(lock, cvar)
-            });
-    }
-}
-
 // non-static configuration (given as arg)
 #[derive(Copy, Clone, Default)]
-pub struct Config {
+pub struct DynamicConfig {
     x_offset: f64,
     y_offset: f64,
     width: f64,
@@ -145,11 +105,11 @@ pub struct Config {
 
 struct BarState {
     cairo: cairo::Context,
-    connection: xcb::Connection,
+    connection: Arc<xcb::Connection>,
     window: xcb::xproto::Window,
     pixmap: xcb::xproto::Pixmap,
     gcontext: xcb::xproto::Gcontext,
-    config: Config,
+    config: DynamicConfig,
     modules_left: Vec<Box<dyn BarModule>>,
     modules_right: Vec<Box<dyn BarModule>>,
     modules_global: Vec<Box<dyn BarModule>>,
@@ -170,14 +130,14 @@ fn get_root_visual_type(screen: &xcb::Screen) -> xcb::Visualtype {
 fn main() {
     // parse arguments
     let args: Vec<String> = std::env::args().collect();
-    let mut config: Config = Default::default();
+    let mut dyn_config: DynamicConfig = Default::default();
     match args.len() {
         6 => {
-            config.x_offset = args[1].parse::<f64>().unwrap();
-            config.y_offset = args[2].parse::<f64>().unwrap();
-            config.width = args[3].parse::<f64>().unwrap();
-            config.height = args[4].parse::<f64>().unwrap();
-            config.monitor = args[5].parse::<i32>().unwrap();
+            dyn_config.x_offset = args[1].parse::<f64>().unwrap();
+            dyn_config.y_offset = args[2].parse::<f64>().unwrap();
+            dyn_config.width = args[3].parse::<f64>().unwrap();
+            dyn_config.height = args[4].parse::<f64>().unwrap();
+            dyn_config.monitor = args[5].parse::<i32>().unwrap();
         },
         _ => panic!("wrong number of arguments"),
     }
@@ -188,7 +148,7 @@ fn main() {
     let screen = setup.roots().nth(screen_num as usize).unwrap();
     let win = conn.generate_id();
 
-    let ev_mask = xcb::EVENT_MASK_EXPOSURE | xcb::EVENT_MASK_BUTTON_PRESS;
+    let ev_mask = xcb::EVENT_MASK_EXPOSURE | xcb::EVENT_MASK_KEY_PRESS;
     let value_list = &[
         (xcb::CW_EVENT_MASK, ev_mask),
         (xcb::CW_OVERRIDE_REDIRECT, 1)
@@ -197,10 +157,10 @@ fn main() {
                        xcb::COPY_FROM_PARENT as u8,
                        win,
                        screen.root(),
-                       config.x_offset as i16,
-                       config.y_offset as i16,
-                       config.width as u16,
-                       config.height as u16,
+                       dyn_config.x_offset as i16,
+                       dyn_config.y_offset as i16,
+                       dyn_config.width as u16,
+                       dyn_config.height as u16,
                        0,
                        xcb::WINDOW_CLASS_INPUT_OUTPUT as u16,
                        screen.root_visual(),
@@ -216,8 +176,8 @@ fn main() {
                                screen.root_depth(),
                                pixmap,
                                screen.root(),
-                               config.width as u16,
-                               config.height as u16);
+                               dyn_config.width as u16,
+                               dyn_config.height as u16);
 
     // set up graphics context
     let gcontext = conn.generate_id();
@@ -242,55 +202,60 @@ fn main() {
     let surface = cairo::XCBSurface::create(&cairo_conn,
                                             &cairo::XCBDrawable(pixmap),
                                             &visual_type,
-                                            config.width as i32,
-                                            config.height as i32)
+                                            dyn_config.width as i32,
+                                            dyn_config.height as i32)
         .expect("failed to create XCBSurface");
     let cr = cairo::Context::new(&surface);
+
+    let conn_arc = Arc::new(conn);
 
     // modules and bar state
     let bar_state = BarState {
         cairo:          cr,
-        connection:     conn,
+        connection:     conn_arc.clone(),
         window:         win,
         pixmap:         pixmap,
         gcontext:       gcontext,
-        config:         config,
-        modules_left:   vec![
-            Box::new(herbstluftwm::HerbstluftWM { config }),
-        ],
-        modules_right:  vec![
-            Box::new(clock::Clock { config: config }),
-            Box::new(battery::Battery {
-                config: config,
-                dirs: vec![
-                    String::from("/sys/class/power_supply/BAT0/"),
-                    String::from("/sys/class/power_supply/BAT1/"),
-                ],
-            }),
-        ],
-        modules_global: vec![ Box::new(basebar::BaseBar {}), ],
+        config:         dyn_config,
+        modules_left:   modules_left(dyn_config),
+        modules_right:  modules_right(dyn_config),
+        modules_global: modules_global(dyn_config),
     };
 
-    // event generators
-    let event_generators: Vec<fn(&Mutex<bool>,&Condvar)> = vec![
-        periodic_event_generator,
-        herbstluftwm_event_generator
-    ];
-
-    let p0 = Arc::new((Mutex::new(false), Condvar::new()));
+    let sync = Arc::new((Mutex::new(false), Condvar::new()));
 
     // start event generators
-    for ev_g in event_generators {
-        let pc = p0.clone();
-        thread::spawn(move || {
-            ev_g(&pc.0, &pc.1);
-        });
+    let all_modules = bar_state.modules_global.iter().chain(
+        bar_state.modules_left.iter().chain(
+            bar_state.modules_right.iter()));
+    for m in all_modules {
+        let s = sync.clone();
+        m.event_generator(s);
     }
 
-    // start drawing thread
+    let s = sync.clone();
     let draw_thread_handler = thread::spawn(move || {
-        draw_thread(&bar_state, &p0.0, &p0.1);
+        draw_thread(&bar_state, &s.0, &s.1);
     });
+
+    // deal with X events in the main thread
+    loop {
+        let event = conn_arc.wait_for_event();
+        match event {
+            None => break,
+            Some(event) => {
+                let r = event.response_type() & !0x80;
+                match r {
+                    xcb::EXPOSE => {
+                        signal_mutex(&sync.0, &sync.1);
+                    }
+                    xcb::KEY_PRESS => {
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
 
     draw_thread_handler.join().unwrap();
 }

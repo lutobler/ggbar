@@ -1,12 +1,16 @@
-use crate::{CairoTextBox, Config, Alignment};
+use crate::{CairoTextBox, DynamicConfig, Alignment};
+use std::time::Duration;
+use std::thread;
+use std::sync::{Arc, Mutex, Condvar};
 use std::fs::File;
 use crate::config::*;
 use std::io::{BufRead, BufReader};
 use crate::utils;
 use super::BarModule;
+use crate::utils::*;
 
 pub struct Battery {
-    pub config: Config,
+    pub config: DynamicConfig,
     pub dirs: Vec<String>,
 }
 
@@ -77,6 +81,15 @@ impl BarModule for Battery {
             align = b.draw(cairo);
             i += 1;
         }
-        align 
+        align
+    }
+
+    fn event_generator(&self, sync: Arc<(Mutex<bool>, Condvar)>) {
+        thread::spawn(move || {
+            loop {
+                signal_mutex(&sync.0, &sync.1);
+                thread::sleep(Duration::from_millis(60000));
+            }
+        });
     }
 }

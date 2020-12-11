@@ -1,3 +1,4 @@
+use std::sync::{Arc, Mutex, Condvar};
 use crate::config::*;
 use crate::utils;
 use super::BarModule;
@@ -9,5 +10,9 @@ impl BarModule for BaseBar {
         utils::cairo_source_rgb_hex(cairo, COLOR_BG);
         cairo.paint();
         align
+    }
+
+    fn event_generator(&self, _sync: Arc<(Mutex<bool>, Condvar)>) {
+        // no op
     }
 }

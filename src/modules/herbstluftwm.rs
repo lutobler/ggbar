@@ -1,11 +1,15 @@
-use crate::{CairoTextBox, Config, Alignment};
-use std::process::Command;
+use std::sync::{Arc, Mutex, Condvar};
+use std::io::{BufRead, BufReader};
+use std::process::{Command, Stdio};
+use std::thread;
+use crate::{CairoTextBox, DynamicConfig, Alignment};
 use crate::config::*;
+use crate::utils::*;
 use crate::utils;
 use super::BarModule;
 
 pub struct HerbstluftWM {
-    pub config: Config
+    pub config: DynamicConfig
 }
 
 #[derive(PartialEq)]
@@ -126,5 +130,26 @@ impl BarModule for HerbstluftWM {
             left_border = new_left + TAG_SPACE;
         }
         left_border
+    }
+
+    fn event_generator(&self, sync: Arc<(Mutex<bool>, Condvar)>) {
+        thread::spawn(move || {
+            loop {
+                let hc_output = Command::new("/usr/bin/herbstclient")
+                    .arg("-i")
+                    .arg("tag_changed|tag_renamed")
+                    .stdout(Stdio::piped())
+                    .spawn()
+                    .expect("failed to execute command")
+                    .stdout
+                    .expect("failed to execute command");
+                let reader = BufReader::new(hc_output);
+                reader.lines()
+                    .filter_map(|line| line.ok())
+                    .for_each(|_| {
+                        signal_mutex(&sync.0, &sync.1)
+                    });
+            }
+        });
     }
 }

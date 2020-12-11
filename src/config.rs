@@ -1,3 +1,6 @@
+use crate::modules::*;
+use crate::DynamicConfig;
+
 pub const FONT: &str                             = "Inconsolata Bold 11";
 pub const DATE_FORMAT: &str                      = "%a %d.%m.%Y [%H:%M:%S]";
 pub const INTERVAL: u64                          = 500; // milliseconds
@@ -6,7 +9,7 @@ pub const TAG_MARGIN: f64                        = 8.0;
 pub const TAG_SPACE: f64                         = 0.0;
 pub const BLOCK_SPACE: f64                       = 0.0;
 
-// monitor focus square size in % of height
+// hlwm monitor focus square size in % of height
 pub const MONITOR_FOCUS_SIZE: f64                = 0.5;
 
 pub const COLOR_BG: u32                          = 0x333333;
@@ -26,3 +29,25 @@ pub const COLOR_URGENT_WINDOW: u32               = 0xff0000;
 // monitor focus
 pub const COLOR_MONITOR_FOCUSED: u32             = 0x2399d7;
 pub const COLOR_MONITOR_UNFOCUSED: u32           = 0xdfdfdf;
+
+// bar modules
+pub fn modules_global(_dynamic_config: DynamicConfig) -> Vec<Box<dyn BarModule>> {
+    vec![ Box::new(basebar::BaseBar{}) ]
+}
+
+pub fn modules_left(dynamic_config: DynamicConfig) -> Vec<Box<dyn BarModule>> {
+    vec![ Box::new(herbstluftwm::HerbstluftWM{ config: dynamic_config }), ]
+}
+
+pub fn modules_right(dynamic_config: DynamicConfig) -> Vec<Box<dyn BarModule>> {
+    vec![
+        Box::new(clock::Clock{ config: dynamic_config }),
+        // Box::new(battery::Battery {
+        //     config: config,
+        //     dirs: vec![
+        //         String::from("/sys/class/power_supply/BAT0/"),
+        //         String::from("/sys/class/power_supply/BAT1/"),
+        //     ],
+        // }),
+    ]
+}
