@@ -116,17 +116,6 @@ struct BarState {
 }
 unsafe impl Send for BarState {}
 
-fn get_root_visual_type(screen: &xcb::Screen) -> xcb::Visualtype {
-    for depth in screen.allowed_depths() {
-        for visual in depth.visuals() {
-            if screen.root_visual() == visual.visual_id() {
-                return visual;
-            }
-        }
-    }
-    panic!("no visual type found");
-}
-
 fn main() {
     // parse arguments
     let args: Vec<String> = std::env::args().collect();

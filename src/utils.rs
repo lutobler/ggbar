@@ -26,6 +26,17 @@ pub fn setup_pango_layout(cairo: &cairo::Context) -> pango::Layout {
     return pango_layout
 }
 
+pub fn get_root_visual_type(screen: &xcb::Screen) -> xcb::Visualtype {
+    for depth in screen.allowed_depths() {
+        for visual in depth.visuals() {
+            if screen.root_visual() == visual.visual_id() {
+                return visual;
+            }
+        }
+    }
+    panic!("no visual type found");
+}
+
 pub fn signal_mutex(lock: &Mutex<bool>, cvar: &Condvar) {
     let mut signaled = lock.lock().unwrap();
     *signaled = true;
