@@ -1,16 +1,15 @@
+use crate::{CairoTextBox, DynamicConfig, Alignment};
+use crate::BarState;
+use crate::config::*;
+use crate::utils::*;
+use crate::utils;
 use std::sync::{Arc, Mutex, Condvar};
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use std::thread;
-use crate::{CairoTextBox, DynamicConfig, Alignment};
-use crate::config::*;
-use crate::utils::*;
-use crate::utils;
 use super::BarModule;
 
-pub struct HerbstluftWM {
-    pub config: DynamicConfig
-}
+pub struct HerbstluftWM {}
 
 #[derive(PartialEq)]
 enum TagState {
@@ -94,8 +93,8 @@ impl Tag {
 }
 
 impl BarModule for HerbstluftWM {
-    fn render(&self, cairo: &cairo::Context, align: f64) -> f64 {
-        let tags = Tag::read_hlwm_tags(self.config.monitor);
+    fn render(&self, dyn_config: DynamicConfig, cairo: &cairo::Context, align: f64) -> f64 {
+        let tags = Tag::read_hlwm_tags(dyn_config.monitor);
 
         // monitor focus status square
         let mut focus_color = COLOR_MONITOR_UNFOCUSED;
@@ -105,8 +104,8 @@ impl BarModule for HerbstluftWM {
             }
         }
         utils::cairo_source_rgb_hex(cairo, focus_color);
-        let focus_state_w = self.config.height;
-        let h = self.config.height;
+        let focus_state_w = dyn_config.height;
+        let h = dyn_config.height;
         let focus_margin = 0.5 * (h - (h * MONITOR_FOCUS_SIZE));
         cairo.rectangle(focus_margin + align,
                         focus_margin,
@@ -119,7 +118,7 @@ impl BarModule for HerbstluftWM {
         for t in tags {
             let b = CairoTextBox {
                 text: t.name,
-                height: self.config.height,
+                height: dyn_config.height,
                 color_text: COLOR_TEXT,
                 color_box: t.state.color(),
                 alignment: Alignment::Left,
@@ -132,10 +131,10 @@ impl BarModule for HerbstluftWM {
         left_border
     }
 
-    fn event_generator(&self, sync: Arc<(Mutex<bool>, Condvar)>) {
+    fn event_generator(&self, bar_state: Arc<(Mutex<BarState>, Condvar)>) {
         thread::spawn(move || {
             loop {
-                let hc_output = Command::new("/usr/bin/herbstclient")
+                let hc_output = Command::new("herbstclient")
                     .arg("-i")
                     .arg("tag_changed|tag_renamed")
                     .stdout(Stdio::piped())
@@ -147,7 +146,7 @@ impl BarModule for HerbstluftWM {
                 reader.lines()
                     .filter_map(|line| line.ok())
                     .for_each(|_| {
-                        signal_mutex(&sync.0, &sync.1)
+                        signal_bar_redraw(bar_state.clone())
                     });
             }
         });

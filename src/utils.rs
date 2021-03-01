@@ -1,5 +1,6 @@
-use std::sync::{Mutex, Condvar};
 use crate::config::*;
+use crate::BarState;
+use std::sync::{Arc, Mutex, Condvar};
 
 pub fn cairo_source_rgb_hex(cairo: &cairo::Context, color: u32) {
     cairo.set_source_rgb(
@@ -37,9 +38,9 @@ pub fn get_root_visual_type(screen: &xcb::Screen) -> xcb::Visualtype {
     panic!("no visual type found");
 }
 
-pub fn signal_mutex(lock: &Mutex<bool>, cvar: &Condvar) {
-    let mut signaled = lock.lock().unwrap();
-    *signaled = true;
-    cvar.notify_one();
-    drop(signaled);
+pub fn signal_bar_redraw(bar_state: Arc<(Mutex<BarState>, Condvar)>) {
+    let mut b = bar_state.0.lock().unwrap();
+    let c = &bar_state.1;
+    b.redraw_signaled = true;
+    c.notify_one();
 }

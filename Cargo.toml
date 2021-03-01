@@ -12,3 +12,4 @@ pangocairo = "0.9.0"
 xcb = { version = "0.9", features = ["shm"] }
 chrono = "0.4.11"
 libpulse-binding = "2.16.0"
+regex = "1"

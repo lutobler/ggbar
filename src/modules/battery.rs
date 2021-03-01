@@ -1,4 +1,5 @@
 use crate::{CairoTextBox, DynamicConfig, Alignment};
+use crate::BarState;
 use std::time::Duration;
 use std::thread;
 use std::sync::{Arc, Mutex, Condvar};
@@ -10,12 +11,11 @@ use super::BarModule;
 use crate::utils::*;
 
 pub struct Battery {
-    pub config: DynamicConfig,
     pub dirs: Vec<String>,
 }
 
 impl BarModule for Battery {
-    fn render(&self, cairo: &cairo::Context, mut align: f64) -> f64 {
+    fn render(&self, dyn_config: DynamicConfig, cairo: &cairo::Context, mut align: f64) -> f64 {
         let mut i = 0;
         for d in &self.dirs {
             let f = File::open(d.clone() + "capacity")
@@ -35,43 +35,43 @@ impl BarModule for Battery {
             }
 
             // battery symbol
-            let bat_sym_h = 0.6 * self.config.height;
-            let bat_sym_w = 1.25 * self.config.height;
+            let bat_sym_h = 0.6 * dyn_config.height;
+            let bat_sym_w = 1.25 * dyn_config.height;
             let bat_sym_margin = 3.0;
             let bat_sym_left = align - (bat_sym_w + 2.0*bat_sym_margin) - margin;
-            let bat_fill_margin = 0.15 * self.config.height;
+            let bat_fill_margin = 0.15 * dyn_config.height;
 
             // background
             utils::cairo_source_rgb_hex(cairo, COLOR_BG_BATTERY);
             cairo.rectangle(bat_sym_left,
                             0.0,
                             bat_sym_w + 2.0 * bat_sym_margin + margin,
-                            self.config.height);
+                            dyn_config.height);
             cairo.fill();
             // battery background
             utils::cairo_source_rgb_hex(cairo, 0x0);
             cairo.rectangle(align - (bat_sym_w + bat_sym_margin) - margin,
-                            0.5 * (self.config.height - bat_sym_h),
+                            0.5 * (dyn_config.height - bat_sym_h),
                             bat_sym_w,
                             bat_sym_h);
             cairo.fill();
             // battery "connector piece"
             cairo.rectangle(align - (bat_sym_margin) - margin,
-                            0.5 * (self.config.height - bat_sym_h * 0.5),
+                            0.5 * (dyn_config.height - bat_sym_h * 0.5),
                             3.0,
                             bat_sym_h * 0.5);
             cairo.fill();
             // faded inner color
             utils::cairo_source_rgb_rgfade(cairo, p);
             cairo.rectangle(align - (bat_sym_w + bat_sym_margin) + bat_fill_margin - margin,
-                            0.5 * (self.config.height - bat_sym_h) + bat_fill_margin,
+                            0.5 * (dyn_config.height - bat_sym_h) + bat_fill_margin,
                             (bat_sym_w - 2.0 * bat_fill_margin) * p,
                             bat_sym_h - 2.0 * bat_fill_margin);
             cairo.fill();
 
             let b = CairoTextBox {
                 text: format!("{}%", percentage),
-                height: self.config.height,
+                height: dyn_config.height,
                 color_text: COLOR_TEXT,
                 color_box: COLOR_BG_BATTERY,
                 alignment: Alignment::Right,
@@ -84,10 +84,10 @@ impl BarModule for Battery {
         align
     }
 
-    fn event_generator(&self, sync: Arc<(Mutex<bool>, Condvar)>) {
+    fn event_generator(&self, bar_state: Arc<(Mutex<BarState>, Condvar)>) {
         thread::spawn(move || {
             loop {
-                signal_mutex(&sync.0, &sync.1);
+                signal_bar_redraw(bar_state.clone());
                 thread::sleep(Duration::from_millis(60000));
             }
         });

@@ -10,12 +10,14 @@ use modules::BarModule;
 mod utils;
 use utils::*;
 
+mod stalonetray;
+
 enum Alignment {
     Left,
     Right
 }
 
-struct CairoTextBox {
+pub struct CairoTextBox {
     text: String,
     height: f64,
     color_text: u32,
@@ -57,39 +59,45 @@ impl CairoTextBox {
     }
 }
 
-fn draw_thread(bar_state: &BarState, lock: &Mutex<bool>, cvar: &Condvar) {
+fn draw_thread(x_state: XState, bar_state: Arc<(Mutex<BarState>,Condvar)>) {
     loop {
-        let mut signaled = lock.lock().unwrap();
-        while !*signaled {
-            signaled = cvar.wait(signaled).unwrap();
+        let mut b = bar_state.0.lock().unwrap();
+        let c = &bar_state.1;
+
+        if b.bar_closed {
+            break;
+        }
+
+        // let mut signaled = lock.lock().unwrap();
+        while !b.redraw_signaled {
+            b = c.wait(b).unwrap();
         }
 
         // render modules
-        for m in bar_state.modules_global.iter() {
-            m.render(&bar_state.cairo, 0.0);
+        for m in b.modules_global.iter() {
+            m.render(b.dyn_config, &x_state.cairo, 0.0);
         }
 
         let mut l = 0.0;
-        for m in bar_state.modules_left.iter() {
-            l = m.render(&bar_state.cairo, l) + BLOCK_SPACE;
+        for m in b.modules_left.iter() {
+            l = m.render(b.dyn_config, &x_state.cairo, l) + BLOCK_SPACE;
         }
 
-        let mut r = bar_state.config.width;
-        for m in bar_state.modules_right.iter() {
-            r = m.render(&bar_state.cairo, r) - BLOCK_SPACE;
+        let mut r = b.dyn_config.width;
+        for m in b.modules_right.iter() {
+            r = m.render(b.dyn_config, &x_state.cairo, r) - BLOCK_SPACE;
         }
 
-        xcb::xproto::copy_area(&bar_state.connection,
-                               bar_state.pixmap,
-                               bar_state.window,
-                               bar_state.gcontext,
+        xcb::xproto::copy_area(&x_state.connection,
+                               x_state.pixmap,
+                               x_state.window,
+                               x_state.gcontext,
                                0, 0, 0, 0,
-                               bar_state.config.width as u16,
-                               bar_state.config.height as u16);
-        bar_state.connection.flush();
+                               b.dyn_config.width as u16,
+                               b.dyn_config.height as u16);
+        x_state.connection.flush();
 
-        *signaled = false;
-        drop(signaled);
+        b.redraw_signaled = false;
     }
 }
 
@@ -103,13 +111,19 @@ pub struct DynamicConfig {
     monitor: i32,
 }
 
-struct BarState {
+struct XState {
     cairo: cairo::Context,
     connection: Arc<xcb::Connection>,
     window: xcb::xproto::Window,
     pixmap: xcb::xproto::Pixmap,
     gcontext: xcb::xproto::Gcontext,
-    config: DynamicConfig,
+}
+unsafe impl Send for XState {}
+
+pub struct BarState {
+    redraw_signaled: bool,
+    bar_closed: bool,
+    dyn_config: DynamicConfig,
     modules_left: Vec<Box<dyn BarModule>>,
     modules_right: Vec<Box<dyn BarModule>>,
     modules_global: Vec<Box<dyn BarModule>>,
@@ -130,6 +144,16 @@ fn main() {
         },
         _ => panic!("wrong number of arguments"),
     }
+
+    // modules and bar state
+    let bar_state = Arc::new((Mutex::new(BarState {
+        redraw_signaled: false,
+        bar_closed:      false,
+        dyn_config:      dyn_config,
+        modules_left:    modules_left(),
+        modules_right:   modules_right(),
+        modules_global:  modules_global(),
+    }), Condvar::new()));
 
     // set up xcb
     let (conn, screen_num) = xcb::Connection::connect(None).unwrap();
@@ -197,35 +221,36 @@ fn main() {
     let cr = cairo::Context::new(&surface);
 
     let conn_arc = Arc::new(conn);
-
-    // modules and bar state
-    let bar_state = BarState {
-        cairo:          cr,
-        connection:     conn_arc.clone(),
-        window:         win,
-        pixmap:         pixmap,
-        gcontext:       gcontext,
-        config:         dyn_config,
-        modules_left:   modules_left(dyn_config),
-        modules_right:  modules_right(dyn_config),
-        modules_global: modules_global(dyn_config),
+    let x_state = XState {
+        cairo:      cr,
+        connection: conn_arc.clone(),
+        window:     win,
+        pixmap:     pixmap,
+        gcontext:   gcontext,
     };
 
-    let sync = Arc::new((Mutex::new(false), Condvar::new()));
-
     // start event generators
-    let all_modules = bar_state.modules_global.iter().chain(
-        bar_state.modules_left.iter().chain(
-            bar_state.modules_right.iter()));
-    for m in all_modules {
-        let s = sync.clone();
-        m.event_generator(s);
+    {
+        let bs = bar_state.clone();
+        let b = bs.0.lock().unwrap();
+        let all_modules = b.modules_global.iter().chain(
+            b.modules_left.iter().chain(
+                b.modules_right.iter()));
+        for m in all_modules {
+            m.event_generator(bar_state.clone());
+        }
     }
 
-    let s = sync.clone();
+    // start drawing thread
+    let b0 = bar_state.clone();
     let draw_thread_handler = thread::spawn(move || {
-        draw_thread(&bar_state, &s.0, &s.1);
+        draw_thread(x_state, b0);
     });
+
+    // run stalonetray if enabled
+    if STALONETRAY_ENABLED {
+        stalonetray::run(bar_state.clone());
+    }
 
     // deal with X events in the main thread
     loop {
@@ -236,7 +261,7 @@ fn main() {
                 let r = event.response_type() & !0x80;
                 match r {
                     xcb::EXPOSE => {
-                        signal_mutex(&sync.0, &sync.1);
+                        signal_bar_redraw(bar_state.clone());
                     }
                     xcb::KEY_PRESS => {
                     }
@@ -246,5 +271,9 @@ fn main() {
         }
     }
 
+    {
+        let mut b = bar_state.0.lock().unwrap();
+        b.bar_closed = true;
+    }
     draw_thread_handler.join().unwrap();
 }
