@@ -1,36 +1,44 @@
 use crate::modules::*;
 
-pub const STALONETRAY_ENABLED: bool              = true;
-pub const COLOR_BG_STALONETRAY: u32              = 0x606060;
-
-pub const FONT: &str                             = "Inconsolata Bold 17";
-pub const DATE_FORMAT: &str                      = "%a %d.%m.%Y [%H:%M:%S]";
-pub const INTERVAL: u64                          = 500; // milliseconds
-pub const BLOCK_MARGIN: f64                      = 10.0;
-pub const TAG_MARGIN: f64                        = 8.0;
-pub const TAG_SPACE: f64                         = 0.0;
-pub const BLOCK_SPACE: f64                       = 0.0;
+pub const FONT: &str                = "Inconsolata Bold 17";
+pub const DATE_FORMAT: &str         = "%a %d.%m.%Y [%H:%M:%S]";
+pub const INTERVAL: u64             = 500; // milliseconds
+pub const BLOCK_MARGIN: f64         = 10.0;
+pub const TAG_MARGIN: f64           = 8.0;
+pub const TAG_SPACE: f64            = 0.0;
+pub const BLOCK_SPACE: f64          = 0.0;
+pub const STALONETRAY_ENABLED: bool = true;
 
 // hlwm monitor focus square size in % of height
-pub const MONITOR_FOCUS_SIZE: f64                = 0.5;
+pub const MONITOR_FOCUS_SIZE: f64   = 0.5;
 
-pub const COLOR_BG: u32                          = 0x333333;
-pub const COLOR_TEXT: u32                        = 0xdfdfdf;
-pub const COLOR_BG_CLOCK: u32                    = 0x606060;
-pub const COLOR_BG_BATTERY: u32                  = 0x808080;
+pub const C_RED: u32    = 0xf2777a;
+pub const C_GRAY1: u32  = 0x393939;
+pub const C_GRAY3: u32  = 0x747369;
+pub const C_GRAY4: u32  = 0xa09f93;
+pub const C_PURPLE: u32 = 0xcc99cc;
+pub const C_BLUE: u32   = 0x6699cc;
+pub const C_GREEN: u32  = 0x99cc99;
+pub const C_WHITE6: u32 = 0xe8e6df;
 
-// tag status
-pub const COLOR_EMPTY: u32                       = 0x606060;
-pub const COLOR_NON_EMPTY: u32                   = 0x7e2d71;
-pub const COLOR_THIS_MONITOR_UNFOCUSED: u32      = 0x2399d7;
-pub const COLOR_THIS_MONITOR_FOCUSED: u32        = 0x2399d7;
-pub const COLOR_DIFFERENT_MONITOR_UNFOCUSED: u32 = 0x308b55;
-pub const COLOR_DIFFERENT_MONITOR_FOCUSED: u32   = 0x308b55;
-pub const COLOR_URGENT_WINDOW: u32               = 0xff0000;
+pub const COLOR_BG: u32                          = C_GRAY1;
+pub const COLOR_TEXT: u32                        = C_WHITE6;
+pub const COLOR_BG_CLOCK: u32                    = C_GRAY3;
+pub const COLOR_BG_BATTERY: u32                  = C_GRAY4;
+pub const COLOR_BG_STALONETRAY: u32              = C_GRAY3;
+
+// hlwm tags
+pub const COLOR_EMPTY: u32                       = C_GRAY3;
+pub const COLOR_NON_EMPTY: u32                   = C_PURPLE;
+pub const COLOR_THIS_MONITOR_UNFOCUSED: u32      = C_BLUE;
+pub const COLOR_THIS_MONITOR_FOCUSED: u32        = C_BLUE;
+pub const COLOR_DIFFERENT_MONITOR_UNFOCUSED: u32 = C_GREEN;
+pub const COLOR_DIFFERENT_MONITOR_FOCUSED: u32   = C_GREEN;
+pub const COLOR_URGENT_WINDOW: u32               = C_RED;
 
 // monitor focus
-pub const COLOR_MONITOR_FOCUSED: u32             = 0x2399d7;
-pub const COLOR_MONITOR_UNFOCUSED: u32           = 0xdfdfdf;
+pub const COLOR_MONITOR_FOCUSED: u32             = C_BLUE;
+pub const COLOR_MONITOR_UNFOCUSED: u32           = C_WHITE6;
 
 
 // bar modules
