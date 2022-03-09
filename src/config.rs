@@ -1,11 +1,11 @@
 use crate::modules::*;
 
-pub const FONT: &str                = "Inconsolata Bold 17";
+// pub const FONT: &str                = "Inconsolata Bold 18";
 pub const DATE_FORMAT: &str         = "%a %d.%m.%Y [%H:%M:%S]";
 pub const INTERVAL: u64             = 500; // milliseconds
 pub const BLOCK_MARGIN: f64         = 10.0;
-pub const TAG_MARGIN: f64           = 8.0;
-pub const TAG_SPACE: f64            = 0.0;
+pub const TAG_MARGIN: f64           = 10.0;
+pub const TAG_SPACE: f64            = 2.0;
 pub const BLOCK_SPACE: f64          = 0.0;
 pub const STALONETRAY_ENABLED: bool = true;
 

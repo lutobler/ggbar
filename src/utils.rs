@@ -1,4 +1,3 @@
-use crate::config::*;
 use crate::BarState;
 use std::sync::{Arc, Mutex, Condvar};
 
@@ -19,10 +18,10 @@ pub fn cairo_source_rgb_rgfade(cairo: &cairo::Context, p: f64) {
     }
 }
 
-pub fn setup_pango_layout(cairo: &cairo::Context) -> pango::Layout {
+pub fn setup_pango_layout(cairo: &cairo::Context, font: String) -> pango::Layout {
     let pango_layout = pangocairo::create_layout(&cairo)
         .expect("failed create pango layout");
-    let font_description = pango::FontDescription::from_string(FONT);
+    let font_description = pango::FontDescription::from_string(&font[..]);
     pango_layout.set_font_description(Some(&font_description));
     return pango_layout
 }

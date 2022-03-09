@@ -3,9 +3,11 @@
 Status bar for Herbstluftwm.
 
 ```
-ggbar x-offset y-offset width height monitor-num
+ggbar x-offset y-offset width height monitor-num font stalone-offset stalone-enabled
 ```
-E.g. `ggbar 0 0 1920 20 0`
+E.g. `ggbar 0 0 1920 20 0 'Inconsolata Bold 12' 0 'true'`
+
+Note that `stalone-offset` is measure from the *right* of the screen.
 
 ## FAQ
 

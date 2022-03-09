@@ -125,7 +125,7 @@ impl BarModule for HerbstluftWM {
                 align: left_border,
                 margin: TAG_MARGIN,
             };
-            let new_left = b.draw(cairo);
+            let new_left = b.draw(cairo, dyn_config.clone().font);
             left_border = new_left + TAG_SPACE;
         }
         left_border

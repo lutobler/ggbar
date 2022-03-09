@@ -28,8 +28,8 @@ pub struct CairoTextBox {
 }
 
 impl CairoTextBox {
-    fn draw(&self, cairo: &cairo::Context) -> f64 {
-        let pl = setup_pango_layout(cairo);
+    fn draw(&self, cairo: &cairo::Context, font: String) -> f64 {
+        let pl = setup_pango_layout(cairo, font);
         pl.set_text(self.text.as_str());
         let (w, h) = pl.get_size();
         let w_text = (w / pango::SCALE) as f64;
@@ -75,17 +75,17 @@ fn draw_thread(x_state: XState, bar_state: Arc<(Mutex<BarState>,Condvar)>) {
 
         // render modules
         for m in b.modules_global.iter() {
-            m.render(b.dyn_config, &x_state.cairo, 0.0);
+            m.render(b.dyn_config.clone(), &x_state.cairo, 0.0);
         }
 
         let mut l = 0.0;
         for m in b.modules_left.iter() {
-            l = m.render(b.dyn_config, &x_state.cairo, l) + BLOCK_SPACE;
+            l = m.render(b.dyn_config.clone(), &x_state.cairo, l) + BLOCK_SPACE;
         }
 
         let mut r = b.dyn_config.width;
         for m in b.modules_right.iter() {
-            r = m.render(b.dyn_config, &x_state.cairo, r) - BLOCK_SPACE;
+            r = m.render(b.dyn_config.clone(), &x_state.cairo, r) - BLOCK_SPACE;
         }
 
         xcb::xproto::copy_area(&x_state.connection,
@@ -102,13 +102,16 @@ fn draw_thread(x_state: XState, bar_state: Arc<(Mutex<BarState>,Condvar)>) {
 }
 
 // non-static configuration (given as arg)
-#[derive(Copy, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct DynamicConfig {
     x_offset: f64,
     y_offset: f64,
     width: f64,
     height: f64,
     monitor: i32,
+    font: String,
+    stalone_offset: i32,
+    stalone_enabled: bool,
 }
 
 struct XState {
@@ -135,12 +138,15 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     let mut dyn_config: DynamicConfig = Default::default();
     match args.len() {
-        6 => {
+        9 => {
             dyn_config.x_offset = args[1].parse::<f64>().unwrap();
             dyn_config.y_offset = args[2].parse::<f64>().unwrap();
             dyn_config.width = args[3].parse::<f64>().unwrap();
             dyn_config.height = args[4].parse::<f64>().unwrap();
             dyn_config.monitor = args[5].parse::<i32>().unwrap();
+            dyn_config.font = args[6].clone();
+            dyn_config.stalone_offset = args[7].parse::<i32>().unwrap();
+            dyn_config.stalone_enabled = args[8].parse::<bool>().unwrap();
         },
         _ => panic!("wrong number of arguments"),
     }
@@ -149,7 +155,7 @@ fn main() {
     let bar_state = Arc::new((Mutex::new(BarState {
         redraw_signaled: false,
         bar_closed:      false,
-        dyn_config:      dyn_config,
+        dyn_config:      dyn_config.clone(),
         modules_left:    modules_left(),
         modules_right:   modules_right(),
         modules_global:  modules_global(),
@@ -248,7 +254,7 @@ fn main() {
     });
 
     // run stalonetray if enabled
-    if STALONETRAY_ENABLED {
+    if STALONETRAY_ENABLED && dyn_config.stalone_enabled {
         stalonetray::run(bar_state.clone());
     }
 

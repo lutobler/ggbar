@@ -78,7 +78,7 @@ impl BarModule for Battery {
                 align: bat_sym_left,
                 margin: BLOCK_MARGIN,
             };
-            align = b.draw(cairo);
+            align = b.draw(cairo, dyn_config.clone().font);
             i += 1;
         }
         align

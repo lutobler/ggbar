@@ -16,12 +16,12 @@ pub fn run(bar_state: Arc<(Mutex<BarState>,Condvar)>) {
                       --icon-size {} \
                       --background \"#{:x}\" \
                       --grow-gravity E \
-                      --geometry 1x1-0+{} \
+                      --geometry 1x1-{}+0 \
                       --kludges force_icons_size \
                       --log-level info 2>&1",
                       b.dyn_config.height,
                       COLOR_BG_STALONETRAY,
-                      b.dyn_config.x_offset);
+                      b.dyn_config.stalone_offset);
     }
     let re = Regex::new(r"geometry: \d+x\d+\+(\d+)*").unwrap();
     thread::spawn(move || {

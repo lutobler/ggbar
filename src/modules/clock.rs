@@ -23,7 +23,7 @@ impl BarModule for Clock {
             align: align,
             margin: BLOCK_MARGIN,
         };
-        b.draw(cairo)
+        b.draw(cairo, dyn_config.font)
     }
 
     fn event_generator(&self, bar_state: Arc<(Mutex<BarState>, Condvar)>) {
