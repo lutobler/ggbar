@@ -14,6 +14,12 @@ Note that `stalone-offset` is measure from the *right* of the screen.
 ![Screenshot of hlwm tags](screenshots/tags.png)
 ![Screenshot of clock and stalonetray](screenshots/clock.png)
 
+- The blue rectangle to the left of the tags shows that the screen is focused. On unfocused screens, a white rectangle is visible.
+- Blue: Tag visible on this screen
+- Green: Tag visible on different screen
+- Pink: Tag active, but not visible
+- Gray: Tag inactive
+
 ## FAQ
 
 - Why? Polybar doesn't really support HerbstluftWM. Also making this
